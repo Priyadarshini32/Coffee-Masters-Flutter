@@ -1,14 +1,31 @@
 import 'package:coffee_masters/model/product.dart';
 
 class Category {
-  String name;
-  List<Product> products;
+  final int id;
+  final String name;
+  final List<Product> products;
 
-  Category({required this.name, required this.products});
+  Category({
+    required this.id,
+    required this.name,
+    required this.products,
+  });
 
   factory Category.fromJson(Map<String, dynamic> json) {
-    var productsJson = json['products'] as Iterable<dynamic>;
-    var products = productsJson.map((p) => Product.fromJson(p)).toList();
-    return Category(name: json['name'] as String, products: products);
+    return Category(
+      id: json['id'],
+      name: json['name'],
+      products: (json['products'] as List)
+          .map((product) => Product.fromJson(product))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'products': products.map((product) => product.toJson()).toList(),
+    };
   }
 }
