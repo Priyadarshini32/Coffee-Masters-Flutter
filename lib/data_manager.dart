@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+import 'dart:io' show Platform;
+import 'package:sqflite/sqflite.dart';
 
 class DataManager extends ChangeNotifier {
   final DatabaseHelper _dbHelper = DatabaseHelper();
@@ -35,8 +37,12 @@ class DataManager extends ChangeNotifier {
         print('Initializing for web platform...');
         var webFactory = databaseFactoryFfiWeb;
         await _dbHelper.initializeWithFactory(webFactory);
-      } else {
+      } else if (Platform.isAndroid || Platform.isIOS) {
         print('Initializing for mobile platform...');
+        // For mobile platforms, use the default sqflite implementation
+        await _dbHelper.initializeWithFactory(databaseFactory);
+      } else {
+        print('Initializing for desktop platforms...');
         sqfliteFfiInit();
         var desktopFactory = databaseFactoryFfi;
         await _dbHelper.initializeWithFactory(desktopFactory);
@@ -67,8 +73,10 @@ class DataManager extends ChangeNotifier {
         _isInitialized = true;
         notifyListeners();
       } else {
-        print('Initialization failed for mobile platform');
-        rethrow;
+        print('Initialization failed for platform');
+        // Set initialized to true anyway to prevent infinite loading
+        _isInitialized = true;
+        notifyListeners();
       }
     }
   }
@@ -84,13 +92,17 @@ class DataManager extends ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     if (!_isInitialized) {
+      print('DataManager not initialized, attempting to initialize...');
       await _initialize();
     }
 
     try {
+      print('Attempting to login with email: $email');
       User? user = await _dbHelper.getUserByEmail(email);
+      print('User found: ${user != null}');
 
       if (user != null && user.password == password) {
+        print('Login successful for user: ${user.id}');
         _currentUserId = user.id;
         _currentUser = user;
 
@@ -101,19 +113,31 @@ class DataManager extends ChangeNotifier {
         notifyListeners();
         return true;
       }
+      print('Login failed: Invalid credentials');
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error logging in: $e');
+      print('Stack trace: $stackTrace');
       return false;
     }
   }
 
   Future<bool> register(User user) async {
     if (!_isInitialized) {
+      print('DataManager not initialized, attempting to initialize...');
       await _initialize();
     }
 
     try {
+      print('Attempting to register user with email: ${user.email}');
+      
+      // Check if user already exists
+      User? existingUser = await _dbHelper.getUserByEmail(user.email);
+      if (existingUser != null) {
+        print('User with email ${user.email} already exists');
+        return false;
+      }
+
       // Generate a unique ID for the user
       String userId = DateTime.now().millisecondsSinceEpoch.toString();
       User userWithId = user.copyWith(
@@ -121,14 +145,20 @@ class DataManager extends ChangeNotifier {
         createdAt: DateTime.now().toIso8601String(),
       );
 
+      print('Creating new user with ID: $userId');
       int result = await _dbHelper.insertUser(userWithId);
+      
       if (result > 0) {
+        print('User registered successfully');
         // Don't set current user here, let them login first
         return true;
       }
+      
+      print('Failed to register user');
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('Error registering user: $e');
+      print('Stack trace: $stackTrace');
       return false;
     }
   }

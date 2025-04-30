@@ -7,6 +7,8 @@ import 'package:coffee_masters/model/itemincart.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
+import 'package:path_provider/path_provider.dart' as path_provider;
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -19,6 +21,9 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   Future<void> initializeWithFactory(DatabaseFactory factory) async {
+    if (factory == null) {
+      throw Exception('Database factory cannot be null');
+    }
     _factory = factory;
     _database = null; // Reset database to force recreation with new factory
     await database; // Initialize database with new factory
@@ -31,180 +36,302 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'coffee_masters.db');
-    var db = await (_factory ?? databaseFactory).openDatabase(path);
-    await _createDb(db, 1);
-    return db;
+    try {
+      print('Initializing database...');
+      String path;
+      
+      if (kIsWeb) {
+        path = 'coffee_masters.db';
+      } else if (Platform.isAndroid || Platform.isIOS) {
+        // For mobile platforms, use the app's documents directory
+        path = join(await getDatabasesPath(), 'coffee_masters.db');
+      } else {
+        // For desktop platforms
+        final appDir = await path_provider.getApplicationDocumentsDirectory();
+        path = join(appDir.path, 'coffee_masters.db');
+      }
+      
+      print('Database path: $path');
+      
+      if (_factory == null) {
+        throw Exception('Database factory is not initialized');
+      }
+      
+      var db = await _factory!.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (Database db, int version) async {
+            print('Creating database tables...');
+            await _createDb(db, version);
+          },
+          onOpen: (Database db) async {
+            print('Database opened successfully');
+          },
+        ),
+      );
+      
+      if (db == null) {
+        throw Exception('Failed to open database');
+      }
+      
+      print('Database initialized successfully');
+      return db;
+    } catch (e) {
+      print('Error initializing database: $e');
+      rethrow;
+    }
   }
 
   Future<void> _createDb(Database db, int version) async {
-    // Create users table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS users(
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        phone TEXT,
-        address TEXT,
-        profileImage TEXT,
-        createdAt TEXT NOT NULL
-      )
-    ''');
+    try {
+      print('Creating database tables...');
+      
+      // Create users table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS users(
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          phone TEXT,
+          address TEXT,
+          profileImage TEXT,
+          createdAt TEXT NOT NULL
+        )
+      ''');
 
-    // Create categories table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS categories(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL
-      )
-    ''');
+      // Create categories table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS categories(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL
+        )
+      ''');
 
-    // Create products table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS products(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        price REAL NOT NULL,
-        description TEXT,
-        image TEXT NOT NULL,
-        categoryId INTEGER NOT NULL,
-        FOREIGN KEY (categoryId) REFERENCES categories (id)
-      )
-    ''');
+      // Create products table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS products(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          price REAL NOT NULL,
+          description TEXT,
+          image TEXT NOT NULL,
+          categoryId INTEGER NOT NULL,
+          FOREIGN KEY (categoryId) REFERENCES categories (id)
+        )
+      ''');
 
-    // Create cart items table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS cart_items(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId TEXT,
-        productId INTEGER NOT NULL,
-        quantity INTEGER NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users (id),
-        FOREIGN KEY (productId) REFERENCES products (id)
-      )
-    ''');
+      // Create cart items table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cart_items(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT,
+          productId INTEGER NOT NULL,
+          quantity INTEGER NOT NULL,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          FOREIGN KEY (productId) REFERENCES products (id)
+        )
+      ''');
 
-    // Create orders table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS orders(
-        id TEXT PRIMARY KEY,
-        userId TEXT,
-        date TEXT NOT NULL,
-        items TEXT NOT NULL,
-        totalAmount REAL NOT NULL,
-        status TEXT NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users (id)
-      )
-    ''');
+      // Create orders table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS orders(
+          id TEXT PRIMARY KEY,
+          userId TEXT,
+          date TEXT NOT NULL,
+          items TEXT NOT NULL,
+          totalAmount REAL NOT NULL,
+          status TEXT NOT NULL,
+          FOREIGN KEY (userId) REFERENCES users (id)
+        )
+      ''');
 
-    // Insert initial data
-    await _insertInitialData(db);
+      print('Database tables created successfully');
+      
+      // Insert initial data only if this is a new database
+      if (version == 1) {
+        print('Inserting initial data...');
+        await _insertInitialData(db);
+      }
+    } catch (e) {
+      print('Error creating database tables: $e');
+      rethrow;
+    }
   }
 
   Future<void> _insertInitialData(Database db) async {
-    // Insert categories
-    List<Map<String, dynamic>> categories = [
-      {'id': 1, 'name': 'Hot Coffee'},
-      {'id': 2, 'name': 'Iced Coffee'},
-      {'id': 3, 'name': 'Tea'},
-      {'id': 4, 'name': 'Pastries'}
-    ];
+    try {
+      print('Starting to insert initial data...');
+      
+      // Check if default user exists
+      List<Map<String, dynamic>> existingUser = await db.query(
+        'users',
+        where: 'email = ?',
+        whereArgs: ['user@example.com'],
+      );
 
-    for (var category in categories) {
-      await db.insert('categories', category);
-    }
-
-    // Insert products
-    List<Map<String, dynamic>> products = [
-      {
-        'name': 'Black Americano',
-        'price': 3.99,
-        'description': 'Rich espresso with hot water',
-        'image': 'blackamericano.png',
-        'categoryId': 1
-      },
-      {
-        'name': 'Cappuccino',
-        'price': 4.49,
-        'description': 'Espresso with steamed milk and foam',
-        'image': 'cappuccino.png',
-        'categoryId': 1
-      },
-      {
-        'name': 'Cold Brew',
-        'price': 4.99,
-        'description': 'Slow-steeped coffee served cold',
-        'image': 'coldbrew.png',
-        'categoryId': 2
-      },
-      {
-        'name': 'Flat White',
-        'price': 4.29,
-        'description': 'Espresso with velvety steamed milk',
-        'image': 'flatwhite.png',
-        'categoryId': 1
-      },
-      {
-        'name': 'Frappuccino',
-        'price': 5.49,
-        'description': 'Blended coffee drink with ice',
-        'image': 'frappuccino.png',
-        'categoryId': 2
-      },
-      {
-        'name': 'Iced Coffee',
-        'price': 3.99,
-        'description': 'Chilled coffee served over ice',
-        'image': 'icedcoffee.png',
-        'categoryId': 2
-      },
-      {
-        'name': 'Macchiato',
-        'price': 3.79,
-        'description': 'Espresso with a dollop of foam',
-        'image': 'macchiato.png',
-        'categoryId': 1
-      },
-      {
-        'name': 'Black Tea',
-        'price': 3.49,
-        'description': 'Classic black tea',
-        'image': 'blacktea.png',
-        'categoryId': 3
-      },
-      {
-        'name': 'Green Tea',
-        'price': 3.49,
-        'description': 'Refreshing green tea',
-        'image': 'greentea.png',
-        'categoryId': 3
-      },
-      {
-        'name': 'Croissant',
-        'price': 2.99,
-        'description': 'Buttery, flaky pastry',
-        'image': 'croissant.png',
-        'categoryId': 4
-      },
-      {
-        'name': 'Muffin',
-        'price': 2.49,
-        'description': 'Freshly baked muffin',
-        'image': 'muffin.png',
-        'categoryId': 4
+      if (existingUser.isEmpty) {
+        print('Creating default user...');
+        // Insert default user only if it doesn't exist
+        await db.insert('users', {
+          'id': 'default_user',
+          'name': 'Default User',
+          'email': 'user@example.com',
+          'password': 'password123',
+          'phone': null,
+          'address': null,
+          'profileImage': null,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+        print('Default user created successfully');
+      } else {
+        print('Default user already exists');
       }
-    ];
 
-    for (var product in products) {
-      await db.insert('products', product);
+      // Check if categories exist
+      List<Map<String, dynamic>> existingCategories = await db.query('categories');
+      if (existingCategories.isEmpty) {
+        print('Creating categories...');
+        // Insert categories only if they don't exist
+        List<Map<String, dynamic>> categories = [
+          {'id': 1, 'name': 'Hot Coffee'},
+          {'id': 2, 'name': 'Iced Coffee'},
+          {'id': 3, 'name': 'Tea'},
+          {'id': 4, 'name': 'Pastries'}
+        ];
+
+        for (var category in categories) {
+          await db.insert('categories', category);
+        }
+        print('Categories created successfully');
+      } else {
+        print('Categories already exist');
+      }
+
+      // Check if products exist
+      List<Map<String, dynamic>> existingProducts = await db.query('products');
+      if (existingProducts.isEmpty) {
+        print('Creating products...');
+        // Insert products only if they don't exist
+        List<Map<String, dynamic>> products = [
+          {
+            'name': 'Black Americano',
+            'price': 3.99,
+            'description': 'Rich espresso with hot water',
+            'image': 'blackamericano.png',
+            'categoryId': 1
+          },
+          {
+            'name': 'Cappuccino',
+            'price': 4.49,
+            'description': 'Espresso with steamed milk and foam',
+            'image': 'cappuccino.png',
+            'categoryId': 1
+          },
+          {
+            'name': 'Cold Brew',
+            'price': 4.99,
+            'description': 'Slow-steeped coffee served cold',
+            'image': 'coldbrew.png',
+            'categoryId': 2
+          },
+          {
+            'name': 'Flat White',
+            'price': 4.29,
+            'description': 'Espresso with velvety steamed milk',
+            'image': 'flatwhite.png',
+            'categoryId': 1
+          },
+          {
+            'name': 'Frappuccino',
+            'price': 5.49,
+            'description': 'Blended coffee drink with ice',
+            'image': 'frappuccino.png',
+            'categoryId': 2
+          },
+          {
+            'name': 'Iced Coffee',
+            'price': 3.99,
+            'description': 'Chilled coffee served over ice',
+            'image': 'icedcoffee.png',
+            'categoryId': 2
+          },
+          {
+            'name': 'Macchiato',
+            'price': 3.79,
+            'description': 'Espresso with a dollop of foam',
+            'image': 'macchiato.png',
+            'categoryId': 1
+          },
+          {
+            'name': 'Black Tea',
+            'price': 3.49,
+            'description': 'Classic black tea',
+            'image': 'blacktea.png',
+            'categoryId': 3
+          },
+          {
+            'name': 'Green Tea',
+            'price': 3.49,
+            'description': 'Refreshing green tea',
+            'image': 'greentea.png',
+            'categoryId': 3
+          },
+          {
+            'name': 'Croissant',
+            'price': 2.99,
+            'description': 'Buttery, flaky pastry',
+            'image': 'croissant.png',
+            'categoryId': 4
+          },
+          {
+            'name': 'Muffin',
+            'price': 2.49,
+            'description': 'Freshly baked muffin',
+            'image': 'muffin.png',
+            'categoryId': 4
+          }
+        ];
+
+        for (var product in products) {
+          await db.insert('products', product);
+        }
+        print('Products created successfully');
+      } else {
+        print('Products already exist');
+      }
+    } catch (e) {
+      print('Error inserting initial data: $e');
     }
   }
 
   // User operations
   Future<int> insertUser(User user) async {
-    Database db = await database;
-    return await db.insert('users', user.toMap());
+    try {
+      print('Attempting to insert user: ${user.email}');
+      Database db = await database;
+      
+      // Check if user already exists
+      List<Map<String, dynamic>> existing = await db.query(
+        'users',
+        where: 'email = ?',
+        whereArgs: [user.email],
+      );
+      
+      if (existing.isNotEmpty) {
+        print('User with email ${user.email} already exists');
+        return 0;
+      }
+      
+      // Insert the user
+      int result = await db.insert('users', user.toMap());
+      print('User inserted successfully with result: $result');
+      return result;
+    } catch (e) {
+      print('Error inserting user: $e');
+      return 0;
+    }
   }
 
   Future<User?> getUserByEmail(String email) async {

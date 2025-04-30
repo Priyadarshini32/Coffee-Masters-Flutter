@@ -71,7 +71,7 @@ class _LoginPageState extends State<LoginPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 40),
-                Center(child: Image.asset("images/logo.png", height: 80)),
+                Center(child: Image.asset("images/logo.png", height: 150)),
                 const SizedBox(height: 48),
                 const Text(
                   "Welcome Back!",

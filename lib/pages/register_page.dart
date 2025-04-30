@@ -118,7 +118,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Center(child: Image.asset("images/logo.png", height: 60)),
+                        Center(child: Image.asset("images/logo.png", height: 150)),
                         const SizedBox(height: 24),
                         TextFormField(
                           controller: _nameController,

@@ -12,6 +12,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io' show Platform;
+import 'package:sqflite/sqflite.dart';
 
 // Global reference to data manager for easy access
 late DataManager globalDataManager;
@@ -23,8 +25,11 @@ Future<void> initializeApp() async {
   if (kIsWeb) {
     // For web platform
     databaseFactory = databaseFactoryFfiWeb;
+  } else if (Platform.isAndroid || Platform.isIOS) {
+    // For mobile platforms, use the default sqflite implementation
+    // No need to set databaseFactory as it uses the default one
   } else {
-    // For other platforms
+    // For desktop platforms
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
@@ -39,16 +44,7 @@ Future<void> initializeApp() async {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  if (kIsWeb) {
-    // Initialize SQLite for web
-    databaseFactory = databaseFactoryFfiWeb;
-  } else {
-    // Initialize SQLite for desktop/mobile
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+  await initializeApp();
 
   runApp(
     ChangeNotifierProvider(

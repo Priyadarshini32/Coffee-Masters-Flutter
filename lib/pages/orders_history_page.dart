@@ -71,7 +71,7 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.brown[300]),
+            Icon(Icons.history, size: 120, color: Colors.brown[300]),
             const SizedBox(height: 16),
             Text(
               'No orders yet',
@@ -104,8 +104,8 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Order #${order.id}',
@@ -114,23 +114,24 @@ class _OrdersHistoryPageState extends State<OrdersHistoryPage> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(order.status),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                            order.status,
-                          style: const TextStyle(
-                            color: Colors.white,
-                              fontWeight: FontWeight.bold,
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(order.status),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              order.status,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                      ),
                         ],
                       ),
                   const SizedBox(height: 12),
