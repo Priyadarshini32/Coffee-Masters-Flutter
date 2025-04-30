@@ -208,7 +208,7 @@ class _OrderPageState extends State<OrderPage> {
                   Navigator.pop(context);
                   Navigator.pushReplacementNamed(context, '/main');
                 },
-                child: const Text('Continue Shopping'),
+                child: const Text('Continue'),
               ),
             ],
           );
@@ -546,7 +546,7 @@ class OrderSummary extends StatelessWidget {
                   Navigator.pop(context);
                   Navigator.pushReplacementNamed(context, '/main');
                 },
-                child: const Text('Continue Shopping'),
+                child: const Text('Continue'),
               ),
             ],
           );
